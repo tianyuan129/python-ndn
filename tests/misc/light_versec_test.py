@@ -341,8 +341,8 @@ class TestLvsSemantics:
             lvs = r'''
             #KEY: "KEY"/_/_/_
             #article: /"article"/_topic/_ & { _topic: "eco" | "spo" } <= #author
-            #author: /site/"author"/_/#KEY <= #anchor
-            #anchor: /site/#KEY & {site: "la" | "ny" }
+            #author: /_site/"author"/_/#KEY & {_site: "la" | "ny" } <= #anchor
+            #anchor: /_site/#KEY & {_site: "la" | "ny" }
             '''
             checker = Checker(compile_lvs(lvs), {})
 
@@ -353,28 +353,54 @@ class TestLvsSemantics:
             #KEY: "KEY"/_/_/_
             #LAKEY: "KEY"/_/_signer/_ & { _signer: "la-signer" }
             #article: /"article"/_topic/_ & { _topic: "eco" | "spo" } <= #author
-            #author: /site/"author"/_/#LAKEY <= #anchor
-            #anchor: /site/#KEY & {site: "la"}
+            #author: /_site/"author"/_/#LAKEY & { _site: "la" } <= #anchor
+            #anchor: /_site/#KEY & { _site: "ny" }
             '''
             checker = Checker(compile_lvs(lvs), {})
             assert checker.suggest("/article/eco/day1", keychain) == la_author_cert_name
+
+            lvs = r'''
+            #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
+            #blog: _topic/_post/_version & { _topic: "life" | "fin",  _version: $eq_type("v=0") }
+            #article: /"article"/#blog <= #author
+            #author: /_site/"author"/_/#KEY & { _site: "ny" } <= #anchor
+            #anchor: /_site/#KEY & { _site: "ny" }
+            '''
+            checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
+            assert checker.suggest("/article/fin/day1", keychain) == None
+            assert checker.suggest("/article/fin/day1/v=1", keychain) == ny_author_cert_name
             
             lvs = r'''
             #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
-            #article: /"article"/_topic/_ & { _topic: "life" | "fin" } <= #author
-            #author: /site/"author"/_/#KEY & { site: "ny" } <= #anchor
-            #anchor: /site/#KEY & { site: "ny" }
+            #blog: _topic/_post/_version & { _topic: "life" | "fin",  _version: $eq_type("v=0") }
+            #article: /"article"/#blog <= #author
+            #author: /site/"author"/_/#KEY & { site: "la" | "ny" } <= #anchor
+            #anchor: /site/#KEY
             '''
             checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
-            assert checker.suggest("/article/fin/day1", keychain) == ny_author_cert_name
+            assert checker.suggest("/article/fin/day1", keychain) == None
+            assert checker.suggest("/article/fin/day1/v=1", keychain) == la_author_cert_name
+            assert checker.suggest(ny_author_cert_name, keychain) == ny_cert_name
+            assert checker.suggest(ny_cert_name, keychain) == None
+            
+            lvs = r'''
+            #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
+            #blog: _topic/_post/_version & { _topic: "life" | "fin",  _version: $eq_type("v=0") }
+            #article: /"article"/#blog <= #author
+            #author: /_site/"author"/_/#KEY & { _site: "la" | "ny" } <= #anchor
+            #anchor: /_site/#KEY & { _site: "ny" }
+            '''
+            checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
+            assert checker.suggest("/article/fin/day1/v=1", keychain) == la_author_cert_name
+            assert checker.suggest(la_author_cert_name, keychain) == ny_cert_name
+            assert checker.suggest(la_author_cert_name, keychain) == ny_cert_name
             
             lvs = r'''
             #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
             #NYKEY: "KEY"/_/_signer/_version& { _signer: "ny-signer", _version: $eq_type("v=0")}
             #article: /"article"/_topic/_ <= #author
             #author: /site/"author"/_/#NYKEY <= #anchor
-            #anchor: /site/#KEY & {site: "ny"}
-            #site: "ny"
+            #anchor: /site/#KEY
             '''
             checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
             assert checker.suggest("/article/eco/day1", keychain) == ny_author_cert_name        
